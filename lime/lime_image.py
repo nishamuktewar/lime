@@ -7,6 +7,7 @@ from functools import partial
 import numpy as np
 import sklearn
 import sklearn.preprocessing
+import progressbar
 from sklearn.utils import check_random_state
 from skimage.color import gray2rgb
 from progressbar import ProgressBar
@@ -69,6 +70,7 @@ class ImageExplanation(object):
         if negative_only:
             fs = [x[0] for x in exp
                   if x[1] < 0 and abs(x[1]) > min_weight][:num_features]
+        print("fs: ", fs)
         if positive_only or negative_only:
             for f in fs:
                 temp[segments == f] = image[segments == f].copy()
@@ -197,7 +199,7 @@ class LimeImageExplainer(object):
         data, labels = self.data_labels(image, fudged_image, segments,
                                         classifier_fn, num_samples,
                                         batch_size=batch_size)
-
+        #print("labels:", labels)
         distances = sklearn.metrics.pairwise_distances(
             data,
             data[0].reshape(1, -1),
@@ -248,7 +250,10 @@ class LimeImageExplainer(object):
         labels = []
         data[0, :] = 1
         imgs = []
-        pbar = ProgressBar(num_samples)
+        widgets=[progressbar.Percentage(), progressbar.Bar()]
+        pbar = ProgressBar(max_value=num_samples, widgets=widgets)
+        #pbar = ProgressBar(num_samples)
+        sample = 0
         pbar.start()
         for row in data:
             temp = copy.deepcopy(image)
@@ -258,12 +263,14 @@ class LimeImageExplainer(object):
                 mask[segments == z] = True
             temp[mask] = fudged_image[mask]
             imgs.append(temp)
+
             if len(imgs) == batch_size:
                 preds = classifier_fn(np.array(imgs))
                 labels.extend(preds)
                 imgs = []
-            pbar.currval += 1
-            pbar.update()
+            #pbar.currval += 1
+            sample += 1
+            pbar.update(sample)
         pbar.finish()
         if len(imgs) > 0:
             preds = classifier_fn(np.array(imgs))
